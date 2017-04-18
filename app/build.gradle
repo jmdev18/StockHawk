@@ -4,6 +4,7 @@ apply plugin: 'com.noveogroup.android.check'
 
 repositories {
     maven { url "https://jitpack.io" }
+    maven {url "https://clojars.org/repo/"}
 }
 
 android {
@@ -55,11 +56,17 @@ dependencies {
     compile 'com.android.support:appcompat-v7:25.1.0'
     compile 'com.android.support:recyclerview-v7:25.1.0'
     compile 'com.android.support:design:25.1.0'
+    compile 'com.android.support:gridlayout-v7:25.1.0'
     compile 'com.jakewharton:butterknife:8.4.0'
     apt 'com.jakewharton:butterknife-compiler:8.4.0'
     compile 'com.google.guava:guava:20.0'
     compile 'com.yahoofinance-api:YahooFinanceAPI:3.5.0'
     compile 'com.jakewharton.timber:timber:4.4.0'
     compile 'net.sf.opencsv:opencsv:2.3'
+    compile group: 'org.apache.commons', name: 'commons-lang3', version: '3.0'
     compile 'com.github.PhilJay:MPAndroidChart:v3.0.1'
+
+    //Icepick for savingInstanceState
+    compile 'frankiesardo:icepick:3.2.0'
+    provided 'frankiesardo:icepick-processor:3.2.0'
 }

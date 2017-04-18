@@ -1,18 +1,28 @@
 package com.udacity.stockhawk.sync;
 
+import android.annotation.SuppressLint;
 import android.app.job.JobInfo;
 import android.app.job.JobScheduler;
 import android.content.ComponentName;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
+import android.os.Handler;
+import android.preference.PreferenceManager;
+import android.support.annotation.IntDef;
+import android.widget.Toast;
 
+import com.udacity.stockhawk.R;
 import com.udacity.stockhawk.data.Contract;
 import com.udacity.stockhawk.data.PrefUtils;
 
 import java.io.IOException;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashSet;
@@ -28,6 +38,8 @@ import yahoofinance.histquotes.HistoricalQuote;
 import yahoofinance.histquotes.Interval;
 import yahoofinance.quotes.stock.StockQuote;
 
+import static android.os.Looper.getMainLooper;
+
 public final class QuoteSyncJob {
 
     private static final int ONE_OFF_ID = 2;
@@ -36,6 +48,14 @@ public final class QuoteSyncJob {
     private static final int INITIAL_BACKOFF = 10000;
     private static final int PERIODIC_ID = 1;
     private static final int YEARS_OF_HISTORY = 2;
+    public static final int STOCK_STATUS_OK = 0;
+    public static final int STOCK_STATUS_SERVER_DOWN = 1;
+    public static final int STOCK_STATUS_SERVER_INVALID = 2;
+    public static final int STOCK_STATUS_UNKNOWN = 3;
+    public static final int STOCK_STATUS_INVALID = 4;
+    public static final int STOCK_STATUS_EMPTY = 5;
+    private static boolean invalidFlag = false;
+
 
     private QuoteSyncJob() {
     }
@@ -70,36 +90,73 @@ public final class QuoteSyncJob {
 
             while (iterator.hasNext()) {
                 String symbol = iterator.next();
-
-
                 Stock stock = quotes.get(symbol);
-                StockQuote quote = stock.getQuote();
+                StockQuote quote;
+                float change;
+                float price;
+                float dayLowest;
+                float dayHighest;
+                float percentChange;
+                String stockName;
+                String exchangeName;
+                try {
+                    quote = stock.getQuote();
+                    price = quote.getPrice().floatValue();
 
-                float price = quote.getPrice().floatValue();
-                float change = quote.getChange().floatValue();
-                float percentChange = quote.getChangeInPercent().floatValue();
+                    BigDecimal temp = quote.getDayLow();
+                    //This is done because lowest or highest of the day is unknown
+                    //and quote.getDayLow() returns null.
+                    if (temp == null) {
+                        dayLowest = -1;
+                        dayHighest = -1;
+                    } else {
+                        dayLowest = temp.floatValue();
+                        dayHighest = quote.getDayHigh().floatValue();
+                    }
 
-                // WARNING! Don't request historical data for a stock that doesn't exist!
-                // The request will hang forever X_x
-                List<HistoricalQuote> history = stock.getHistory(from, to, Interval.WEEKLY);
+                    change = quote.getChange().floatValue();
+                    percentChange = quote.getChangeInPercent().floatValue();
+                    stockName = stock.getName();
+                    exchangeName = stock.getStockExchange();
+                } catch (NullPointerException exception) {
+                    Timber.e(exception, "Incorrect stock symbol entered : " + symbol);
 
-                StringBuilder historyBuilder = new StringBuilder();
-
-                for (HistoricalQuote it : history) {
-                    historyBuilder.append(it.getDate().getTimeInMillis());
-                    historyBuilder.append(", ");
-                    historyBuilder.append(it.getClose());
-                    historyBuilder.append("\n");
+                    showErrorToast(context, symbol);
+                    PrefUtils.removeStock(context, symbol);
+                    if (PrefUtils.getStocks(context).size() == 0) {
+                        setStockStatus(context, STOCK_STATUS_EMPTY);
+                    } else {
+                        setStockStatus(context, STOCK_STATUS_INVALID);
+                    }
+                    invalidFlag = true;
+                    continue;
                 }
+
+                from = Calendar.getInstance();
+                from.add(Calendar.MONTH, -4);
+                String monthHistory = getHistory(stock, from, to, Interval.MONTHLY);
+
+
+                from = Calendar.getInstance();
+                from.add(Calendar.DAY_OF_YEAR, -35);
+                String weekHistory = getHistory(stock, from, to, Interval.WEEKLY);
+
+                from = Calendar.getInstance();
+                from.add(Calendar.DAY_OF_YEAR, -5);
+                String dayHistory = getHistory(stock, from, to, Interval.DAILY);
 
                 ContentValues quoteCV = new ContentValues();
                 quoteCV.put(Contract.Quote.COLUMN_SYMBOL, symbol);
                 quoteCV.put(Contract.Quote.COLUMN_PRICE, price);
                 quoteCV.put(Contract.Quote.COLUMN_PERCENTAGE_CHANGE, percentChange);
                 quoteCV.put(Contract.Quote.COLUMN_ABSOLUTE_CHANGE, change);
-
-
-                quoteCV.put(Contract.Quote.COLUMN_HISTORY, historyBuilder.toString());
+                quoteCV.put(Contract.Quote.COLUMN_MONTH_HISTORY, monthHistory);
+                quoteCV.put(Contract.Quote.COLUMN_DAY_HISTORY, dayHistory);
+                quoteCV.put(Contract.Quote.COLUMN_WEEK_HISTORY, weekHistory);
+                quoteCV.put(Contract.Quote.COLUMN_DAY_HIGHEST, dayHighest);
+                quoteCV.put(Contract.Quote.COLUMN_DAY_LOWEST, dayLowest);
+                quoteCV.put(Contract.Quote.COLUMN_STOCK_NAME, stockName);
+                quoteCV.put(Contract.Quote.COLUMN_STOCK_EXCHANGE, exchangeName);
 
                 quoteCVs.add(quoteCV);
 
@@ -118,6 +175,47 @@ public final class QuoteSyncJob {
         }
     }
 
+    public static void updateWidget(Context context) {
+        Intent dataUpdatedIntent = new Intent(ACTION_DATA_UPDATED);
+        context.sendBroadcast(dataUpdatedIntent);
+    }
+
+    private static void showErrorToast(final Context context, final String symbol) {
+        Handler handler = new Handler(getMainLooper());
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                Toast.makeText(context, String.format(context.getString(R.string.toast_stock_invalid), symbol), Toast.LENGTH_LONG).show();
+            }
+        });
+    }
+
+    private static String getHistory(Stock stock, Calendar from, Calendar to, Interval interval) throws IOException {
+
+        List<HistoricalQuote> history = new ArrayList<>();
+
+        //At times, query over 5-7 days history returns very less data at times.
+        //hence performing iterative queries until 5 days of data is received.
+
+        if (interval.equals(Interval.DAILY)) {
+            while (history.size() < 5) {
+                history = stock.getHistory(from, to, interval);
+                from.add(Calendar.DAY_OF_YEAR, -1);
+            }
+        } else {
+            history = stock.getHistory(from, to, interval);
+        }
+
+        StringBuilder historyBuilder = new StringBuilder();
+        for (HistoricalQuote it : history) {
+            historyBuilder.append(it.getDate().getTimeInMillis());
+            historyBuilder.append(":");
+            historyBuilder.append(it.getClose());
+            historyBuilder.append("$");
+        }
+        return historyBuilder.toString();
+    }
+
     private static void schedulePeriodic(Context context) {
         Timber.d("Scheduling a periodic task");
 
@@ -134,7 +232,6 @@ public final class QuoteSyncJob {
 
         scheduler.schedule(builder.build());
     }
-
 
     public static synchronized void initialize(final Context context) {
 
@@ -168,5 +265,23 @@ public final class QuoteSyncJob {
         }
     }
 
+    /**
+     * Sets the stock status into shared preference.
+     *
+     * @param c              Context to get the PreferenceManager from.
+     * @param setStockStatus The IntDef value to set
+     */
+    @SuppressLint("CommitPrefEdits")
+    static private void setStockStatus(Context c, @StockStatus int setStockStatus) {
+        SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(c);
+        SharedPreferences.Editor spe = sp.edit();
+        spe.putInt(c.getString(R.string.pref_stock_status_key), setStockStatus);
+        spe.commit();
+    }
 
+
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef({STOCK_STATUS_OK, STOCK_STATUS_SERVER_DOWN, STOCK_STATUS_SERVER_INVALID, STOCK_STATUS_INVALID, STOCK_STATUS_UNKNOWN, STOCK_STATUS_EMPTY})
+    public @interface StockStatus {
+    }
 }
