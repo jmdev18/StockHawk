@@ -42,31 +42,28 @@ import static android.os.Looper.getMainLooper;
 
 public final class QuoteSyncJob {
 
-    private static final int ONE_OFF_ID = 2;
     private static final String ACTION_DATA_UPDATED = "com.udacity.stockhawk.ACTION_DATA_UPDATED";
-    private static final int PERIOD = 300000;
-    private static final int INITIAL_BACKOFF = 10000;
-    private static final int PERIODIC_ID = 1;
-    private static final int YEARS_OF_HISTORY = 2;
     public static final int STOCK_STATUS_OK = 0;
     public static final int STOCK_STATUS_SERVER_DOWN = 1;
     public static final int STOCK_STATUS_SERVER_INVALID = 2;
     public static final int STOCK_STATUS_UNKNOWN = 3;
     public static final int STOCK_STATUS_INVALID = 4;
     public static final int STOCK_STATUS_EMPTY = 5;
+    public static final int STOCK_STATUS_LOADING = 6;
+    private static final int ONE_OFF_ID = 2;
+    private static final int PERIOD = 3600000;
+    private static final int INITIAL_BACKOFF = 10000;
+    private static final int PERIODIC_ID = 1;
     private static boolean invalidFlag = false;
 
-
-    private QuoteSyncJob() {
-    }
-
     static void getQuotes(Context context) {
-
+        Timber.e("In getQuotes");
         Timber.d("Running sync job");
 
-        Calendar from = Calendar.getInstance();
+        setStockStatus(context, STOCK_STATUS_LOADING);
+
+        Calendar from;
         Calendar to = Calendar.getInstance();
-        from.add(Calendar.YEAR, -YEARS_OF_HISTORY);
 
         try {
 
@@ -78,18 +75,26 @@ public final class QuoteSyncJob {
             Timber.d(stockCopy.toString());
 
             if (stockArray.length == 0) {
+                setStockStatus(context, STOCK_STATUS_EMPTY);
                 return;
             }
 
             Map<String, Stock> quotes = YahooFinance.get(stockArray);
             Iterator<String> iterator = stockCopy.iterator();
 
+            if (quotes.isEmpty()) {
+                setStockStatus(context, STOCK_STATUS_SERVER_DOWN);
+                return;
+            }
+
             Timber.d(quotes.toString());
 
             ArrayList<ContentValues> quoteCVs = new ArrayList<>();
 
             while (iterator.hasNext()) {
+
                 String symbol = iterator.next();
+                Timber.e("Symbol : " +  symbol);
                 Stock stock = quotes.get(symbol);
                 StockQuote quote;
                 float change;
@@ -132,17 +137,31 @@ public final class QuoteSyncJob {
                     continue;
                 }
 
+                Timber.e("Getting Monthly History");
+
                 from = Calendar.getInstance();
                 from.add(Calendar.MONTH, -4);
+
+                Timber.e("From : " + from.getTime());
+                Timber.e("To : " + to.getTime());
                 String monthHistory = getHistory(stock, from, to, Interval.MONTHLY);
 
+                Timber.e("Getting Weekly History");
 
                 from = Calendar.getInstance();
                 from.add(Calendar.DAY_OF_YEAR, -35);
+
+                Timber.e("From : " + from.getTime());
+                Timber.e("To : " + to.getTime());
                 String weekHistory = getHistory(stock, from, to, Interval.WEEKLY);
+
+                Timber.e("Getting Daily History");
 
                 from = Calendar.getInstance();
                 from.add(Calendar.DAY_OF_YEAR, -5);
+
+                Timber.e("From : " + from.getTime());
+                Timber.e("To : " + to.getTime());
                 String dayHistory = getHistory(stock, from, to, Interval.DAILY);
 
                 ContentValues quoteCV = new ContentValues();
@@ -166,12 +185,15 @@ public final class QuoteSyncJob {
                     .bulkInsert(
                             Contract.Quote.URI,
                             quoteCVs.toArray(new ContentValues[quoteCVs.size()]));
-
-            Intent dataUpdatedIntent = new Intent(ACTION_DATA_UPDATED);
-            context.sendBroadcast(dataUpdatedIntent);
+            if (!invalidFlag && quoteCVs != null && quoteCVs.size() > 0) setStockStatus(context, STOCK_STATUS_OK);
+            updateWidget(context);
 
         } catch (IOException exception) {
             Timber.e(exception, "Error fetching stock quotes");
+            setStockStatus(context, STOCK_STATUS_SERVER_DOWN);
+        } catch (Exception e) {
+            Timber.e(e, "Unknown Error");
+            setStockStatus(context, STOCK_STATUS_UNKNOWN);
         }
     }
 
@@ -217,51 +239,33 @@ public final class QuoteSyncJob {
     }
 
     private static void schedulePeriodic(Context context) {
-        Timber.d("Scheduling a periodic task");
-
-
+        Timber.e("Scheduling a periodic task");
         JobInfo.Builder builder = new JobInfo.Builder(PERIODIC_ID, new ComponentName(context, QuoteJobService.class));
-
-
         builder.setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
                 .setPeriodic(PERIOD)
                 .setBackoffCriteria(INITIAL_BACKOFF, JobInfo.BACKOFF_POLICY_EXPONENTIAL);
-
-
         JobScheduler scheduler = (JobScheduler) context.getSystemService(Context.JOB_SCHEDULER_SERVICE);
-
         scheduler.schedule(builder.build());
     }
 
     public static synchronized void initialize(final Context context) {
-
         schedulePeriodic(context);
         syncImmediately(context);
-
     }
 
     public static synchronized void syncImmediately(Context context) {
-
-        ConnectivityManager cm =
-                (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        Timber.e("Scheduling Immediate task");
+        ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
         NetworkInfo networkInfo = cm.getActiveNetworkInfo();
         if (networkInfo != null && networkInfo.isConnectedOrConnecting()) {
             Intent nowIntent = new Intent(context, QuoteIntentService.class);
             context.startService(nowIntent);
         } else {
-
             JobInfo.Builder builder = new JobInfo.Builder(ONE_OFF_ID, new ComponentName(context, QuoteJobService.class));
-
-
             builder.setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
                     .setBackoffCriteria(INITIAL_BACKOFF, JobInfo.BACKOFF_POLICY_EXPONENTIAL);
-
-
             JobScheduler scheduler = (JobScheduler) context.getSystemService(Context.JOB_SCHEDULER_SERVICE);
-
             scheduler.schedule(builder.build());
-
-
         }
     }
 
@@ -279,9 +283,8 @@ public final class QuoteSyncJob {
         spe.commit();
     }
 
-
     @Retention(RetentionPolicy.SOURCE)
-    @IntDef({STOCK_STATUS_OK, STOCK_STATUS_SERVER_DOWN, STOCK_STATUS_SERVER_INVALID, STOCK_STATUS_INVALID, STOCK_STATUS_UNKNOWN, STOCK_STATUS_EMPTY})
+    @IntDef({STOCK_STATUS_OK, STOCK_STATUS_SERVER_DOWN, STOCK_STATUS_SERVER_INVALID, STOCK_STATUS_INVALID, STOCK_STATUS_UNKNOWN, STOCK_STATUS_EMPTY, STOCK_STATUS_LOADING})
     public @interface StockStatus {
     }
 }

@@ -18,7 +18,7 @@
     <string name="default_stocks_microsoft">MSFT</string>
     <string name="default_stocks_facebook">FB</string>
 
-
+    <string name="loading_data">Loading data. Please wait…</string>
     <string name="action_change_units">@string/pref_display_mode_key</string>
 
 
@@ -29,6 +29,10 @@
 
     <string name="error_no_network">No network connectivity! Will load stock cursor when the network is available.</string>
     <string name="error_no_stocks">No stocks added! Hit the floating action button to add one.</string>
+    <string name="empty_stock_list">Stock information is not available.</string>
+    <string name="error_server_down">No stock information available. The server is not returning data.</string>
+    <string name="error_server_invalid">No stock information available. The server is not returning valid data. Please check for an updated version of Stock Hawk.</string>
+
 
     <string name="toast_stock_invalid">Symbol %s is invalid!</string>"
     <string name="toast_stock_added_no_connectivity">Symbol %s added. Will refresh when network available.</string>

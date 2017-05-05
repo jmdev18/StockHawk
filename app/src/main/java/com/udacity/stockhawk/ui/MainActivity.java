@@ -1,12 +1,18 @@
 package com.udacity.stockhawk.ui;
 
+import android.annotation.SuppressLint;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.net.ConnectivityManager;
-import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
+import android.support.design.widget.CoordinatorLayout;
+import android.support.design.widget.Snackbar;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.ActivityOptionsCompat;
 import android.support.v4.app.LoaderManager;
@@ -28,25 +34,38 @@ import com.udacity.stockhawk.R;
 import com.udacity.stockhawk.data.Contract;
 import com.udacity.stockhawk.data.PrefUtils;
 import com.udacity.stockhawk.sync.QuoteSyncJob;
+import com.udacity.stockhawk.utils.BasicUtils;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
+import timber.log.Timber;
 
 public class MainActivity extends AppCompatActivity implements LoaderManager.LoaderCallbacks<Cursor>,
         SwipeRefreshLayout.OnRefreshListener,
-        StockAdapter.StockAdapterOnClickHandler {
+        StockAdapter.StockAdapterOnClickHandler,
+                SharedPreferences.OnSharedPreferenceChangeListener{
 
     private static final int STOCK_LOADER = 0;
-    @SuppressWarnings("WeakerAccess")
-    @BindView(R.id.recycler_view)
-    RecyclerView stockRecyclerView;
-    @SuppressWarnings("WeakerAccess")
-    @BindView(R.id.swipe_refresh)
-    SwipeRefreshLayout swipeRefreshLayout;
-    @SuppressWarnings("WeakerAccess")
-    @BindView(R.id.error)
-    TextView error;
+    @BindView(R.id.recycler_view) RecyclerView stockRecyclerView;
+    @BindView(R.id.swipe_refresh) SwipeRefreshLayout swipeRefreshLayout;
+    @BindView(R.id.error) TextView error;
+    @BindView(R.id.activity_main) public CoordinatorLayout activityMainLayout;
     private StockAdapter adapter;
+    private Snackbar snackbar;
+
+    private final BroadcastReceiver broadcastReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (!BasicUtils.isNetworkUp(context)) {
+                showInternetOffSnackBar();
+            } else {
+                swipeRefreshLayout.setRefreshing(true);
+                if (snackbar != null) snackbar.dismiss();
+                Timber.e("broadcastReceiver");
+                updateEmptyView();
+            }
+        }
+    };
 
     @Override
     public void onClick(String symbol, StockAdapter.StockViewHolder viewHolder) {
@@ -64,21 +83,40 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
+        supportPostponeEnterTransition();
         setContentView(R.layout.activity_main);
         ButterKnife.bind(this);
 
         adapter = new StockAdapter(this, this);
         stockRecyclerView.setAdapter(adapter);
         stockRecyclerView.setLayoutManager(new LinearLayoutManager(this));
-
         swipeRefreshLayout.setOnRefreshListener(this);
-        swipeRefreshLayout.setRefreshing(true);
-        onRefresh();
-
-        QuoteSyncJob.initialize(this);
+        if (savedInstanceState == null) {
+            QuoteSyncJob.initialize(this);
+            swipeRefreshLayout.setRefreshing(true);
+        }
+        setUpDeletionOnSlide();
         getSupportLoaderManager().initLoader(STOCK_LOADER, null, this);
+        SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(this);
+        sp.registerOnSharedPreferenceChangeListener(this);
+        registerReceiver(broadcastReceiver, new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION));
+    }
 
+    @Override
+    public void onRefresh() {
+
+        if (BasicUtils.isNetworkUp(this)) {
+            QuoteSyncJob.syncImmediately(this);
+            swipeRefreshLayout.setVisibility(View.VISIBLE);
+            swipeRefreshLayout.setRefreshing(true);
+        } else {
+            swipeRefreshLayout.setRefreshing(false);
+            swipeRefreshLayout.cancelLongPress();
+            showInternetOffSnackBar();
+        }
+    }
+
+    private void setUpDeletionOnSlide() {
         new ItemTouchHelper(new ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.RIGHT) {
             @Override
             public boolean onMove(RecyclerView recyclerView, RecyclerView.ViewHolder viewHolder, RecyclerView.ViewHolder target) {
@@ -88,38 +126,17 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
             @Override
             public void onSwiped(RecyclerView.ViewHolder viewHolder, int direction) {
                 String symbol = adapter.getSymbolAtPosition(viewHolder.getAdapterPosition());
-                PrefUtils.removeStock(MainActivity.this, symbol);
-                getContentResolver().delete(Contract.Quote.makeUriForStock(symbol), null, null);
+                int stockSize = PrefUtils.removeStock(MainActivity.this, symbol);
+                int x = getContentResolver().delete(Contract.Quote.makeUriForStock(symbol), null, null);
+                Timber.d(String.valueOf(x), "Deleted rows");
+                QuoteSyncJob.updateWidget(MainActivity.this);
+                if (stockSize == 0) {
+                    adapter.setCursor(null);
+                    Timber.e("onSwiped");
+                    updateEmptyView();
+                }
             }
         }).attachToRecyclerView(stockRecyclerView);
-    }
-
-    private boolean networkUp() {
-        ConnectivityManager cm =
-                (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
-        NetworkInfo networkInfo = cm.getActiveNetworkInfo();
-        return networkInfo != null && networkInfo.isConnectedOrConnecting();
-    }
-
-    @Override
-    public void onRefresh() {
-
-        QuoteSyncJob.syncImmediately(this);
-
-        if (!networkUp() && adapter.getItemCount() == 0) {
-            swipeRefreshLayout.setRefreshing(false);
-            error.setText(getString(R.string.error_no_network));
-            error.setVisibility(View.VISIBLE);
-        } else if (!networkUp()) {
-            swipeRefreshLayout.setRefreshing(false);
-            Toast.makeText(this, R.string.toast_no_connectivity, Toast.LENGTH_LONG).show();
-        } else if (PrefUtils.getStocks(this).size() == 0) {
-            swipeRefreshLayout.setRefreshing(false);
-            error.setText(getString(R.string.error_no_stocks));
-            error.setVisibility(View.VISIBLE);
-        } else {
-            error.setVisibility(View.GONE);
-        }
     }
 
     public void button(@SuppressWarnings("UnusedParameters") View view) {
@@ -129,7 +146,7 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
     void addStock(String symbol) {
         if (symbol != null && !symbol.isEmpty()) {
 
-            if (networkUp()) {
+            if (BasicUtils.isNetworkUp(this)) {
                 swipeRefreshLayout.setRefreshing(true);
             } else {
                 String message = getString(R.string.toast_stock_added_no_connectivity, symbol);
@@ -151,12 +168,12 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
 
     @Override
     public void onLoadFinished(Loader<Cursor> loader, Cursor data) {
-        swipeRefreshLayout.setRefreshing(false);
-
-        if (data.getCount() != 0) {
-            error.setVisibility(View.GONE);
-        }
         adapter.setCursor(data);
+        Timber.e("onLoadFinished");
+        updateEmptyView();
+        if (data.getCount() != 0) {
+            supportStartPostponedEnterTransition();
+        }
     }
 
     @Override
@@ -193,5 +210,99 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
             return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
+        if (key.equals(getString(R.string.pref_stock_status_key))) {
+            Timber.e("onSharedPreferenceChanged");
+            updateEmptyView();
+        }
+    }
+
+    @SuppressLint("SwitchIntDef")
+    private void updateEmptyView() {
+
+        if (!BasicUtils.isNetworkUp(this)) {
+            showMessage(R.string.error_no_network);
+            return;
+        }
+
+        if (PrefUtils.getStocks(this).size() == 0) {
+            showMessage(R.string.error_no_stocks);
+            return;
+        }
+
+        @QuoteSyncJob.StockStatus int status = PrefUtils.getStockStatus(this);
+        Timber.e("status " + status);
+
+        // Show loading msg if sync is running, whether first time or subsequent sync
+        if(status == QuoteSyncJob.STOCK_STATUS_LOADING) {
+            showMessage(R.string.loading_data);
+            return;
+        }
+
+        // Hide loading msg if sync stopped due to any error, whether first time or subsequent sync
+        switch (status) {
+            case QuoteSyncJob.STOCK_STATUS_EMPTY:
+                showErrorMessage(R.string.error_no_stocks);
+                break;
+            case QuoteSyncJob.STOCK_STATUS_SERVER_DOWN:
+                showErrorMessage(R.string.error_server_down);
+                break;
+            case QuoteSyncJob.STOCK_STATUS_SERVER_INVALID:
+                showErrorMessage(R.string.error_server_invalid);
+                break;
+            case QuoteSyncJob.STOCK_STATUS_UNKNOWN:
+                showErrorMessage(R.string.empty_stock_list);
+                break;
+        }
+
+        // Hide loading msf if sync completed
+        if(status == QuoteSyncJob.STOCK_STATUS_OK)
+            hideMessage();
+    }
+
+    private void showErrorMessage(int message) {
+        BasicUtils.showToast(this, getString(message));
+        hideMessage();
+        return;
+    }
+
+    private void showMessage(int message) {
+        error.setText(message);
+        error.setVisibility(View.VISIBLE);
+        swipeRefreshLayout.setRefreshing(true);
+    }
+
+    private void hideMessage() {
+        error.setText("");
+        error.setVisibility(View.GONE);
+        swipeRefreshLayout.setRefreshing(false);
+    }
+
+    private void showInternetOffSnackBar() {
+        snackbar = Snackbar.make(activityMainLayout,
+                getString(R.string.error_no_network),
+                Snackbar.LENGTH_INDEFINITE);
+        snackbar.setAction(getString(R.string.try_again), new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                onRefresh();
+                if (!BasicUtils.isNetworkUp(MainActivity.this)) {
+                    showInternetOffSnackBar();
+                }
+            }
+        });
+        snackbar.setActionTextColor(getResources().getColor(R.color.material_red_700));
+        snackbar.show();
+    }
+
+    @Override
+    protected void onDestroy() {
+        SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(this);
+        sp.unregisterOnSharedPreferenceChangeListener(this);
+        unregisterReceiver(broadcastReceiver);
+        super.onDestroy();
     }
 }
