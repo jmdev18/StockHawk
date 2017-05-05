@@ -223,13 +223,15 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
     @SuppressLint("SwitchIntDef")
     private void updateEmptyView() {
 
+        Timber.e("updateEmptyView");
+
         if (!BasicUtils.isNetworkUp(this)) {
-            showMessage(R.string.error_no_network);
+            showErrorMessage(R.string.error_no_network);
             return;
         }
 
         if (PrefUtils.getStocks(this).size() == 0) {
-            showMessage(R.string.error_no_stocks);
+            showErrorMessage(R.string.error_no_stocks);
             return;
         }
 
