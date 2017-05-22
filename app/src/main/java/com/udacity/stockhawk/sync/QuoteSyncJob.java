@@ -42,7 +42,7 @@ import static android.os.Looper.getMainLooper;
 
 public final class QuoteSyncJob {
 
-    private static final String ACTION_DATA_UPDATED = "com.udacity.stockhawk.ACTION_DATA_UPDATED";
+    public static final String ACTION_DATA_UPDATED = "com.udacity.stockhawk.ACTION_DATA_UPDATED";
     public static final int STOCK_STATUS_OK = 0;
     public static final int STOCK_STATUS_SERVER_DOWN = 1;
     public static final int STOCK_STATUS_SERVER_INVALID = 2;

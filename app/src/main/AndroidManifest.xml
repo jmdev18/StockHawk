@@ -5,6 +5,7 @@
 
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
     <uses-permission android:name="android.Manifest.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
@@ -38,6 +39,25 @@
             android:enabled="true"
             android:exported="true"
             android:permission="android.permission.BIND_JOB_SERVICE" />
+
+        <!-- Widget receiver and services-->
+        <receiver
+            android:name=".widget.StockWidgetProvider"
+            android:label="@string/stockDetails">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+                <action android:name="com.calgen.stockhawk.ACTION_DATA_UPDATED"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/stock_widget_provider_info"/>
+        </receiver>
+
+        <service
+            android:name=".widget.StockWidgetService"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS"/>
+
     </application>
 
 </manifest>

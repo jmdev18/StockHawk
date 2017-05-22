@@ -11,4 +11,6 @@
     <color name="white">#FFFFFF</color>
 
     <color name="dark_grey_with_opacity">#DE3C3F41</color>
+    <color name="material_green">#388E3C</color>
+    <color name="material_grey">#ff303030</color>
 </resources>
