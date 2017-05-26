@@ -38,18 +38,21 @@ import com.udacity.stockhawk.utils.BasicUtils;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
-import timber.log.Timber;
 
 public class MainActivity extends AppCompatActivity implements LoaderManager.LoaderCallbacks<Cursor>,
         SwipeRefreshLayout.OnRefreshListener,
         StockAdapter.StockAdapterOnClickHandler,
-                SharedPreferences.OnSharedPreferenceChangeListener{
+        SharedPreferences.OnSharedPreferenceChangeListener {
 
     private static final int STOCK_LOADER = 0;
-    @BindView(R.id.recycler_view) RecyclerView stockRecyclerView;
-    @BindView(R.id.swipe_refresh) SwipeRefreshLayout swipeRefreshLayout;
-    @BindView(R.id.error) TextView error;
-    @BindView(R.id.activity_main) public CoordinatorLayout activityMainLayout;
+    @BindView(R.id.recycler_view)
+    RecyclerView stockRecyclerView;
+    @BindView(R.id.swipe_refresh)
+    SwipeRefreshLayout swipeRefreshLayout;
+    @BindView(R.id.error)
+    TextView error;
+    @BindView(R.id.activity_main)
+    public CoordinatorLayout activityMainLayout;
     private StockAdapter adapter;
     private Snackbar snackbar;
 
@@ -61,7 +64,6 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
             } else {
                 swipeRefreshLayout.setRefreshing(true);
                 if (snackbar != null) snackbar.dismiss();
-                Timber.e("broadcastReceiver");
                 updateEmptyView();
             }
         }
@@ -128,11 +130,9 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
                 String symbol = adapter.getSymbolAtPosition(viewHolder.getAdapterPosition());
                 int stockSize = PrefUtils.removeStock(MainActivity.this, symbol);
                 int x = getContentResolver().delete(Contract.Quote.makeUriForStock(symbol), null, null);
-                Timber.d(String.valueOf(x), "Deleted rows");
                 QuoteSyncJob.updateWidget(MainActivity.this);
                 if (stockSize == 0) {
                     adapter.setCursor(null);
-                    Timber.e("onSwiped");
                     updateEmptyView();
                 }
             }
@@ -169,7 +169,6 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
     @Override
     public void onLoadFinished(Loader<Cursor> loader, Cursor data) {
         adapter.setCursor(data);
-        Timber.e("onLoadFinished");
         updateEmptyView();
         if (data.getCount() != 0) {
             supportStartPostponedEnterTransition();
@@ -215,15 +214,12 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
     @Override
     public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
         if (key.equals(getString(R.string.pref_stock_status_key))) {
-            Timber.e("onSharedPreferenceChanged");
             updateEmptyView();
         }
     }
 
     @SuppressLint("SwitchIntDef")
     private void updateEmptyView() {
-
-        Timber.e("updateEmptyView");
 
         if (!BasicUtils.isNetworkUp(this)) {
             showErrorMessage(R.string.error_no_network);
@@ -236,10 +232,9 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         }
 
         @QuoteSyncJob.StockStatus int status = PrefUtils.getStockStatus(this);
-        Timber.e("status " + status);
 
         // Show loading msg if sync is running, whether first time or subsequent sync
-        if(status == QuoteSyncJob.STOCK_STATUS_LOADING) {
+        if (status == QuoteSyncJob.STOCK_STATUS_LOADING) {
             showMessage(R.string.loading_data);
             return;
         }
@@ -261,7 +256,7 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         }
 
         // Hide loading msf if sync completed
-        if(status == QuoteSyncJob.STOCK_STATUS_OK)
+        if (status == QuoteSyncJob.STOCK_STATUS_OK)
             hideMessage();
     }
 

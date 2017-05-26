@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import timber.log.Timber;
 import yahoofinance.Stock;
 import yahoofinance.YahooFinance;
 import yahoofinance.histquotes.HistoricalQuote;
@@ -57,8 +56,6 @@ public final class QuoteSyncJob {
     private static boolean invalidFlag = false;
 
     static void getQuotes(Context context) {
-        Timber.e("In getQuotes");
-        Timber.d("Running sync job");
 
         setStockStatus(context, STOCK_STATUS_LOADING);
 
@@ -71,8 +68,6 @@ public final class QuoteSyncJob {
             Set<String> stockCopy = new HashSet<>();
             stockCopy.addAll(stockPref);
             String[] stockArray = stockPref.toArray(new String[stockPref.size()]);
-
-            Timber.d(stockCopy.toString());
 
             if (stockArray.length == 0) {
                 setStockStatus(context, STOCK_STATUS_EMPTY);
@@ -87,14 +82,11 @@ public final class QuoteSyncJob {
                 return;
             }
 
-            Timber.d(quotes.toString());
-
             ArrayList<ContentValues> quoteCVs = new ArrayList<>();
 
             while (iterator.hasNext()) {
 
                 String symbol = iterator.next();
-                Timber.e("Symbol : " +  symbol);
                 Stock stock = quotes.get(symbol);
                 StockQuote quote;
                 float change;
@@ -124,7 +116,6 @@ public final class QuoteSyncJob {
                     stockName = stock.getName();
                     exchangeName = stock.getStockExchange();
                 } catch (NullPointerException exception) {
-                    Timber.e(exception, "Incorrect stock symbol entered : " + symbol);
 
                     showErrorToast(context, symbol);
                     PrefUtils.removeStock(context, symbol);
@@ -137,31 +128,19 @@ public final class QuoteSyncJob {
                     continue;
                 }
 
-                Timber.e("Getting Monthly History");
-
                 from = Calendar.getInstance();
                 from.add(Calendar.MONTH, -4);
 
-                Timber.e("From : " + from.getTime());
-                Timber.e("To : " + to.getTime());
                 String monthHistory = getHistory(stock, from, to, Interval.MONTHLY);
-
-                Timber.e("Getting Weekly History");
 
                 from = Calendar.getInstance();
                 from.add(Calendar.DAY_OF_YEAR, -35);
 
-                Timber.e("From : " + from.getTime());
-                Timber.e("To : " + to.getTime());
                 String weekHistory = getHistory(stock, from, to, Interval.WEEKLY);
-
-                Timber.e("Getting Daily History");
 
                 from = Calendar.getInstance();
                 from.add(Calendar.DAY_OF_YEAR, -5);
 
-                Timber.e("From : " + from.getTime());
-                Timber.e("To : " + to.getTime());
                 String dayHistory = getHistory(stock, from, to, Interval.DAILY);
 
                 ContentValues quoteCV = new ContentValues();
@@ -185,14 +164,13 @@ public final class QuoteSyncJob {
                     .bulkInsert(
                             Contract.Quote.URI,
                             quoteCVs.toArray(new ContentValues[quoteCVs.size()]));
-            if (!invalidFlag && quoteCVs != null && quoteCVs.size() > 0) setStockStatus(context, STOCK_STATUS_OK);
+            if (!invalidFlag && quoteCVs != null && quoteCVs.size() > 0)
+                setStockStatus(context, STOCK_STATUS_OK);
             updateWidget(context);
 
         } catch (IOException exception) {
-            Timber.e(exception, "Error fetching stock quotes");
             setStockStatus(context, STOCK_STATUS_SERVER_DOWN);
         } catch (Exception e) {
-            Timber.e(e, "Unknown Error");
             setStockStatus(context, STOCK_STATUS_UNKNOWN);
         }
     }
@@ -239,7 +217,6 @@ public final class QuoteSyncJob {
     }
 
     private static void schedulePeriodic(Context context) {
-        Timber.e("Scheduling a periodic task");
         JobInfo.Builder builder = new JobInfo.Builder(PERIODIC_ID, new ComponentName(context, QuoteJobService.class));
         builder.setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
                 .setPeriodic(PERIOD)
@@ -254,7 +231,6 @@ public final class QuoteSyncJob {
     }
 
     public static synchronized void syncImmediately(Context context) {
-        Timber.e("Scheduling Immediate task");
         ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
         NetworkInfo networkInfo = cm.getActiveNetworkInfo();
         if (networkInfo != null && networkInfo.isConnectedOrConnecting()) {

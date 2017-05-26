@@ -10,7 +10,7 @@ import com.udacity.stockhawk.data.Contract.Quote;
 class DbHelper extends SQLiteOpenHelper {
 
 
-    private static final String NAME = "StockHawk.db";
+    private static final String NAME = "StockHawk3e.db";
     private static final int VERSION = 1;
 
     DbHelper(Context context) {
