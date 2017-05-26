@@ -31,8 +31,8 @@ public class Parser {
             timeData.add(Float.valueOf(entry[0]));
             stockPrice.add(Float.valueOf(entry[1]));
         }
-        Collections.reverse(timeData);
-        Collections.reverse(stockPrice);
+//        Collections.reverse(timeData);
+//        Collections.reverse(stockPrice);
         Float referenceTime = timeData.get(0);
         for (int i = 0; i < timeData.size(); i++) {
             entries.add(new Entry(timeData.get(i) - referenceTime, stockPrice.get(i)));
