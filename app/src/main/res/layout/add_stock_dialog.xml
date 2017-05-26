@@ -9,8 +9,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginBottom="@dimen/dialogMargin"
-        android:layout_marginLeft="@dimen/dialogMargin"
-        android:layout_marginRight="@dimen/dialogMargin"
+        android:layout_marginStart="@dimen/dialogMargin"
+        android:layout_marginEnd="@dimen/dialogMargin"
         android:layout_marginTop="@dimen/base_padding"
         android:hint="@string/dialog_hint"
         android:digits="ABCDEFGHIJKLMNOPQRSTUVWXYZ" />

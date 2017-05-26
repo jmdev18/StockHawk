@@ -6,8 +6,8 @@
     android:layout_height="?android:attr/listPreferredItemHeight"
     android:gravity="center_vertical"
     android:orientation="horizontal"
-    android:paddingLeft="@dimen/base_padding"
-    android:paddingRight="@dimen/base_padding">
+    android:paddingStart="@dimen/base_padding"
+    android:paddingEnd="@dimen/base_padding">
 
     <TextView
         android:id="@+id/symbol"
@@ -39,8 +39,8 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:background="@drawable/percent_change_pill_green"
-            android:paddingLeft="@dimen/textMargin"
-            android:paddingRight="@dimen/textMargin"
+            android:paddingStart="@dimen/textMargin"
+            android:paddingEnd="@dimen/textMargin"
             tools:text="100%" />
     </LinearLayout>
 </LinearLayout>
