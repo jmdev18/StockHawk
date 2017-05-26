@@ -13,6 +13,6 @@
         android:layout_marginRight="@dimen/dialogMargin"
         android:layout_marginTop="@dimen/base_padding"
         android:hint="@string/dialog_hint"
-        android:inputType="textCapCharacters" />
+        android:digits="ABCDEFGHIJKLMNOPQRSTUVWXYZ" />
 
 </LinearLayout>
