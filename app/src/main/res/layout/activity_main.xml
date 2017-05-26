@@ -43,14 +43,14 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
-        android:layout_margin="16dp"
+        android:layout_margin="@dimen/base_padding"
         android:contentDescription="@string/add_new_stock_cd"
         android:onClick="button"
         android:src="@drawable/fab_plus"
         app:backgroundTint="@color/material_blue_500"
         app:borderWidth="0dp"
-        app:elevation="6dp"
+        app:elevation="@dimen/fb_elevation"
         app:fabSize="normal"
-        app:pressedTranslationZ="12dp" />
+        app:pressedTranslationZ="@dimen/fb_pressedTranslationZ" />
 
 </android.support.design.widget.CoordinatorLayout>

@@ -9,4 +9,8 @@
     <dimen name="widget_min_resize_width">216dp</dimen>
     <dimen name="widget_min_resize_height">110dp</dimen>
     <dimen name="widget_margin">8dp</dimen>
+    <dimen name="fb_elevation">6dp</dimen>
+    <dimen name="fb_pressedTranslationZ">12dp</dimen>
+    <dimen name="dialogMargin">4dp</dimen>
+    <dimen name="textMargin">4dp</dimen>
 </resources>

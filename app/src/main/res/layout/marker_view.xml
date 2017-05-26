@@ -11,8 +11,8 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:background="@drawable/marker_background"
-        android:elevation="4dp"
-        android:padding="8dp"
+        android:elevation="@dimen/appbar_elevation"
+        android:padding="@dimen/widget_margin"
         android:textColor="@android:color/white"
         tools:text="$14 on 21 December 2016" />
 </FrameLayout>
