@@ -143,17 +143,50 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         new AddStockDialog().show(getFragmentManager(), "StockDialogFragment");
     }
 
-    void addStock(String symbol) {
+    void addStock(final String symbol) {
         if (symbol != null && !symbol.isEmpty()) {
 
             if (BasicUtils.isNetworkUp(this)) {
                 swipeRefreshLayout.setRefreshing(true);
             } else {
                 String message = getString(R.string.toast_stock_added_no_connectivity, symbol);
-                Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+                snackbar = Snackbar.make(activityMainLayout,
+                        message,
+                        Snackbar.LENGTH_INDEFINITE);
+                snackbar.setAction(getString(R.string.try_again), new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        onRefresh();
+                        if (!BasicUtils.isNetworkUp(MainActivity.this)) {
+                            addStock(symbol);
+                        }
+                    }
+                });
+                snackbar.setActionTextColor(getResources().getColor(R.color.material_red_700));
+                snackbar.show();
             }
 
-            PrefUtils.addStock(this, symbol);
+            // check if symbol exists already
+            if(!PrefUtils.getStocks(this).contains(symbol))
+                PrefUtils.addStock(this, symbol);
+            else {
+                String message = getString(R.string.toast_symbol_exists, symbol);
+                        snackbar = Snackbar.make(activityMainLayout,
+                        message,
+                        Snackbar.LENGTH_INDEFINITE);
+                snackbar.setAction(getString(R.string.ok), new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        onRefresh();
+                        if (!BasicUtils.isNetworkUp(MainActivity.this)) {
+                            addStock(symbol);
+                        }
+                    }
+                });
+                snackbar.setActionTextColor(getResources().getColor(R.color.material_red_700));
+                snackbar.show();
+            }
+
             QuoteSyncJob.syncImmediately(this);
         }
     }
