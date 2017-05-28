@@ -115,6 +115,7 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
             swipeRefreshLayout.setRefreshing(false);
             swipeRefreshLayout.cancelLongPress();
             showInternetOffSnackBar();
+            hideMessage();
         }
     }
 
@@ -157,13 +158,11 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
                     @Override
                     public void onClick(View v) {
                         onRefresh();
-                        if (!BasicUtils.isNetworkUp(MainActivity.this)) {
-                            addStock(symbol);
-                        }
                     }
                 });
                 snackbar.setActionTextColor(getResources().getColor(R.color.material_red_700));
                 snackbar.show();
+                hideMessage();
             }
 
             // check if symbol exists already
@@ -178,9 +177,6 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
                     @Override
                     public void onClick(View v) {
                         onRefresh();
-                        if (!BasicUtils.isNetworkUp(MainActivity.this)) {
-                            addStock(symbol);
-                        }
                     }
                 });
                 snackbar.setActionTextColor(getResources().getColor(R.color.material_red_700));
